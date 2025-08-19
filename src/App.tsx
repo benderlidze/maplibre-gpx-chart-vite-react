@@ -14,7 +14,6 @@ function App() {
 
   // Memoize callbacks to prevent unnecessary re-renders
   const onPointHover = useCallback((point: HoverPoint | null) => {
-    console.log("Hovered Point:", point);
     setHoveredPoint(point);
   }, []);
 

@@ -34,7 +34,6 @@ export const MapComponent: React.FC<Props> = ({
 
   return (
     <div className="w-full h-96">
-      {new Date().toISOString()}
       <Map
         ref={mapRef}
         initialViewState={{ latitude: 40, longitude: -100, zoom: 3 }}
