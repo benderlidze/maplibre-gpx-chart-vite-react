@@ -17,6 +17,8 @@ function App() {
     setHoveredPoint(point);
   }, []);
 
+  console.log("Render main");
+
   return (
     <>
       <div>

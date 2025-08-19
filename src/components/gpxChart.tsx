@@ -8,6 +8,7 @@ import {
   LinearScale,
   CategoryScale,
 } from "chart.js";
+import { length, lineString } from "@turf/turf";
 import type { FeatureCollection, Feature, LineString } from "geojson";
 
 // Register required components
@@ -24,6 +25,7 @@ export type HoverPoint = {
   index: number;
   lat: number;
   lon: number;
+  distance: number;
 };
 
 interface SimpleElevationChartProps {
@@ -38,7 +40,7 @@ export const ElevationChart: React.FC<SimpleElevationChartProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<ChartJS | null>(null);
 
-  // Extract elevation data from GeoJSON
+  // Extract elevation data from GeoJSON and calculate cumulative distances
   const elevationData = useMemo(() => {
     const trackFeature = geoJson.features.find(
       (f): f is Feature<LineString> => f.geometry.type === "LineString"
@@ -46,14 +48,25 @@ export const ElevationChart: React.FC<SimpleElevationChartProps> = ({
 
     if (!trackFeature) return [];
 
-    // Extract elevations from coordinates [lon, lat, elevation]
-    return trackFeature.geometry.coordinates
-      .map((coord, index) => ({
-        elevation: coord[2],
-        index,
-        lat: coord[1],
-        lon: coord[0],
-      }))
+    const coordinates = trackFeature.geometry.coordinates;
+
+    return coordinates
+      .map((coord, index) => {
+        // Calculate cumulative distance up to this point
+        const segmentCoords = coordinates.slice(0, index + 1);
+        const distance =
+          index === 0
+            ? 0
+            : length(lineString(segmentCoords), { units: "kilometers" });
+
+        return {
+          elevation: coord[2],
+          index,
+          lat: coord[1],
+          lon: coord[0],
+          distance,
+        };
+      })
       .filter(
         (point) =>
           typeof point.elevation === "number" &&
@@ -70,8 +83,8 @@ export const ElevationChart: React.FC<SimpleElevationChartProps> = ({
       chartRef.current.destroy();
     }
 
-    // Create simple labels (just point numbers)
-    const labels = elevationData.map((_, i) => i.toString());
+    // Create labels with distances (rounded to 2 decimal places)
+    const labels = elevationData.map((point) => point.distance.toFixed(2));
     const elevations = elevationData.map((point) => point.elevation);
 
     // Create chart
@@ -85,11 +98,11 @@ export const ElevationChart: React.FC<SimpleElevationChartProps> = ({
             borderColor: "rgb(34, 197, 94)",
             backgroundColor: "rgba(34, 197, 94, 0.1)",
             fill: true,
-            pointRadius: 0, // Hide points by default
-            pointHoverRadius: 8, // Show larger point on hover
-            pointHoverBackgroundColor: "rgb(239, 68, 68)", // Red dot on hover
-            pointHoverBorderColor: "rgb(255, 255, 255)", // White border for contrast
-            pointHoverBorderWidth: 2, // Border width
+            pointRadius: 0,
+            pointHoverRadius: 8,
+            pointHoverBackgroundColor: "rgb(239, 68, 68)",
+            pointHoverBorderColor: "rgb(255, 255, 255)",
+            pointHoverBorderWidth: 2,
             tension: 0.1,
           },
         ],
@@ -97,16 +110,27 @@ export const ElevationChart: React.FC<SimpleElevationChartProps> = ({
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: false,
         interaction: {
-          intersect: false, // Allow hover anywhere near the line
-          mode: "nearest", // Find the nearest point
+          intersect: false,
+          mode: "nearest",
         },
         plugins: {
           legend: { display: false },
         },
         scales: {
-          x: { title: { display: true, text: "Point Index" } },
-          y: { title: { display: true, text: "Elevation (m)" } },
+          x: {
+            title: {
+              display: true,
+              text: "Distance (km)",
+            },
+          },
+          y: {
+            title: {
+              display: true,
+              text: "Elevation (m)",
+            },
+          },
         },
         onHover: (_event, activeElements) => {
           if (activeElements.length > 0) {
@@ -118,7 +142,6 @@ export const ElevationChart: React.FC<SimpleElevationChartProps> = ({
       },
     });
 
-    // Cleanup
     return () => {
       if (chartRef.current) {
         chartRef.current.destroy();
