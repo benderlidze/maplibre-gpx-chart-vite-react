@@ -3,12 +3,17 @@ import { Map, Source, Layer } from "react-map-gl/maplibre";
 import type { MapRef } from "react-map-gl/maplibre";
 import bbox from "@turf/bbox";
 import "maplibre-gl/dist/maplibre-gl.css";
+import type { HoverPoint } from "./gpxChart";
 
 type Props = {
   geojson?: GeoJSON.FeatureCollection | null;
+  hoveredPoint?: HoverPoint | null;
 };
 
-export const MapComponent: React.FC<Props> = ({ geojson = null }) => {
+export const MapComponent: React.FC<Props> = ({
+  geojson = null,
+  hoveredPoint = null,
+}) => {
   const mapRef = useRef<MapRef | null>(null);
 
   useEffect(() => {
@@ -25,8 +30,11 @@ export const MapComponent: React.FC<Props> = ({ geojson = null }) => {
     }
   }, [geojson]);
 
+  console.log("Render map");
+
   return (
     <div className="w-full h-96">
+      {new Date().toISOString()}
       <Map
         ref={mapRef}
         initialViewState={{ latitude: 40, longitude: -100, zoom: 3 }}
@@ -39,7 +47,7 @@ export const MapComponent: React.FC<Props> = ({ geojson = null }) => {
               id="gpx-line"
               type="line"
               paint={{
-                "line-color": "#ef4444",
+                "line-color": "green",
                 "line-width": 4,
                 "line-opacity": 0.95,
               }}
@@ -50,6 +58,35 @@ export const MapComponent: React.FC<Props> = ({ geojson = null }) => {
             />
           </Source>
         )}
+
+        <Source
+          id="hover-point"
+          type="geojson"
+          data={
+            hoveredPoint
+              ? {
+                  type: "Feature",
+                  geometry: {
+                    type: "Point",
+                    coordinates: [hoveredPoint.lon, hoveredPoint.lat],
+                  },
+                  properties: {
+                    elevation: hoveredPoint.elevation,
+                  },
+                }
+              : { type: "FeatureCollection", features: [] }
+          }
+        >
+          <Layer
+            id="hover-point"
+            type="circle"
+            paint={{
+              "circle-radius": 12,
+              "circle-color": "red",
+              "circle-opacity": 0.8,
+            }}
+          />
+        </Source>
       </Map>
     </div>
   );

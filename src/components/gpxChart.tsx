@@ -19,16 +19,20 @@ ChartJS.register(
   CategoryScale
 );
 
+export type HoverPoint = {
+  elevation: number;
+  index: number;
+  lat: number;
+  lon: number;
+};
+
 interface SimpleElevationChartProps {
   geoJson: FeatureCollection;
-  onHover?: (elevation: number | null, pointIndex: number | null) => void;
-  // called with { lat, lng } or null when not hovering
-  onPointHover?: (coords: { lat: number; lng: number } | null, pointIndex: number | null) => void;
+  onPointHover?: (hoverPoint: HoverPoint) => void;
 }
 
 export const ElevationChart: React.FC<SimpleElevationChartProps> = ({
   geoJson,
-  onHover,
   onPointHover,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -81,8 +85,11 @@ export const ElevationChart: React.FC<SimpleElevationChartProps> = ({
             borderColor: "rgb(34, 197, 94)",
             backgroundColor: "rgba(34, 197, 94, 0.1)",
             fill: true,
-            pointRadius: 0,
-            pointHoverRadius: 4,
+            pointRadius: 0, // Hide points by default
+            pointHoverRadius: 8, // Show larger point on hover
+            pointHoverBackgroundColor: "rgb(239, 68, 68)", // Red dot on hover
+            pointHoverBorderColor: "rgb(255, 255, 255)", // White border for contrast
+            pointHoverBorderWidth: 2, // Border width
             tension: 0.1,
           },
         ],
@@ -90,6 +97,10 @@ export const ElevationChart: React.FC<SimpleElevationChartProps> = ({
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        interaction: {
+          intersect: false, // Allow hover anywhere near the line
+          mode: "nearest", // Find the nearest point
+        },
         plugins: {
           legend: { display: false },
         },
@@ -97,20 +108,11 @@ export const ElevationChart: React.FC<SimpleElevationChartProps> = ({
           x: { title: { display: true, text: "Point Index" } },
           y: { title: { display: true, text: "Elevation (m)" } },
         },
-        onHover: (event, activeElements) => {
+        onHover: (_event, activeElements) => {
           if (activeElements.length > 0) {
             const index = activeElements[0].index;
-            const elevation = elevations[index];
-            onHover?.(elevation, index);
-            const pt = elevationData[index];
-            if (pt && typeof pt.lat === 'number' && typeof pt.lon === 'number') {
-              onPointHover?.({ lat: pt.lat, lng: pt.lon }, index);
-            } else {
-              onPointHover?.(null, index);
-            }
-          } else {
-            onHover?.(null, null);
-            onPointHover?.(null, null);
+            const point = elevationData[index];
+            onPointHover?.(point);
           }
         },
       },
@@ -123,7 +125,7 @@ export const ElevationChart: React.FC<SimpleElevationChartProps> = ({
         chartRef.current = null;
       }
     };
-  }, [elevationData, onHover]);
+  }, [elevationData, onPointHover]);
 
   if (elevationData.length === 0) {
     return (
